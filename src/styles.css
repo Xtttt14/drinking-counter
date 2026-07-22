@@ -6,6 +6,12 @@
   text-rendering: geometricPrecision;
 }
 
+@property --percent {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -414,6 +420,13 @@ h1 {
   place-items: center;
   background: conic-gradient(#1597ff var(--percent), #e8edf2 var(--percent));
   box-shadow: 0 18px 60px rgba(21, 151, 255, 0.15);
+  transition: --percent 520ms ease, transform 220ms ease, box-shadow 220ms ease;
+  animation: ring-arrive 520ms ease both;
+}
+
+.water-ring:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 70px rgba(21, 151, 255, 0.2);
 }
 
 .water-core {
@@ -440,6 +453,7 @@ h1 {
   font-weight: 760;
   letter-spacing: 0;
   white-space: nowrap;
+  transition: transform 220ms ease;
 }
 
 .metric span {
@@ -468,18 +482,20 @@ h1 {
   height: 100%;
   border-radius: inherit;
   background: #1597ff;
+  transition: width 520ms ease;
 }
 
 .action-grid {
   width: min(560px, 86%);
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.65fr);
+  grid-template-columns: minmax(170px, 1fr) minmax(128px, 0.58fr) minmax(128px, 0.58fr);
   gap: 14px;
 }
 
 .add-button,
 .undo-button,
-.manual-button {
+.manual-button,
+.repeat-button {
   min-width: 0;
   height: clamp(48px, 6vh, 58px);
   border-radius: 8px;
@@ -487,6 +503,14 @@ h1 {
   align-items: center;
   justify-content: center;
   gap: 10px;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.add-button:active,
+.undo-button:active,
+.manual-button:active,
+.repeat-button:active {
+  transform: translateY(1px) scale(0.99);
 }
 
 .add-button {
@@ -503,9 +527,15 @@ h1 {
 }
 
 .undo-button,
-.manual-button {
+.manual-button,
+.repeat-button {
   color: #58636f;
   background: #edf1f4;
+}
+
+.repeat-button {
+  color: #315d78;
+  background: #eef8fb;
 }
 
 .manual-button {
@@ -879,6 +909,7 @@ h1 {
 
 .day-cell {
   --fill: 0%;
+  position: relative;
   min-width: 0;
   min-height: 0;
   padding: 9px 10px;
@@ -900,9 +931,21 @@ h1 {
 
 .day-cell em {
   min-height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   color: #70808e;
   font-size: 12px;
   font-style: normal;
+}
+
+.day-cell em b {
+  padding: 1px 5px;
+  border-radius: 999px;
+  color: #0d7b55;
+  background: #dff7ec;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .day-cell.muted {
@@ -921,6 +964,22 @@ h1 {
 
 .day-cell.selected em {
   color: rgba(255, 255, 255, 0.78);
+}
+
+.day-cell.selected em b {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.day-cell.achieved::after {
+  content: "";
+  position: absolute;
+  right: 9px;
+  top: 9px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #19b87a;
 }
 
 .history-side {
@@ -1176,5 +1235,16 @@ h1 {
 
   .metric strong {
     font-size: clamp(42px, 6.2vw, 72px);
+  }
+}
+
+@keyframes ring-arrive {
+  from {
+    transform: scale(0.985);
+    filter: saturate(0.9);
+  }
+  to {
+    transform: scale(1);
+    filter: saturate(1);
   }
 }

@@ -182,10 +182,22 @@ function createTrayImage() {
 function updateTray() {
   if (!tray) return;
   const state = getState();
+  const percent = Math.min(100, Math.round((state.today.totalMl / Math.max(1, state.today.targetMl)) * 100));
+  const reminderStatus = state.today.cups >= state.settings.targetCups
+    ? "已达标，提醒静默"
+    : `提醒 ${state.settings.staleMinutes}分钟`;
   tray.setToolTip(`drinking-counter ${state.today.cups}/${state.settings.targetCups}杯`);
   tray.setContextMenu(Menu.buildFromTemplate([
+    { label: `今日 ${state.today.cups}/${state.settings.targetCups}杯 · ${percent}%`, enabled: false },
+    { label: `${state.today.totalMl}/${state.today.targetMl}ml · ${state.selectedCup.name}`, enabled: false },
+    { label: reminderStatus, enabled: false },
+    { type: "separator" },
     { label: "显示主窗口", click: showWindow },
     { label: `加一杯 (${state.selectedCup.ml}ml)`, click: () => addDrink({ source: "tray" }) },
+    {
+      label: `重复上次容量 (${state.today.lastEntry?.ml || state.selectedCup.ml}ml)`,
+      click: () => addDrink({ source: "tray", ml: state.today.lastEntry?.ml || state.selectedCup.ml })
+    },
     { type: "separator" },
     { label: "退出", click: () => quitApp() }
   ]));

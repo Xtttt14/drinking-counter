@@ -12,6 +12,7 @@ import {
   Droplets,
   Minus,
   Plus,
+  RotateCcw,
   Settings,
   Target,
 } from "lucide-react";
@@ -391,6 +392,14 @@ function ProgressView({ state, setState, percent, remainingCups, remainingMl, up
     setState(next);
   }
 
+  async function repeatLastCapacity() {
+    const next = await window.waterApi.addDrink({
+      ml: state.today.lastEntry?.ml || state.selectedCup.ml,
+      source: "repeat"
+    });
+    setState(next);
+  }
+
   return (
     <section className="progress-page">
       <div className="hero-card">
@@ -437,6 +446,10 @@ function ProgressView({ state, setState, percent, remainingCups, remainingMl, up
           <button className="undo-button" onClick={() => window.waterApi.undoDrink()} disabled={state.today.cups === 0}>
             <Minus size={18} />
             撤销上一杯
+          </button>
+          <button className="repeat-button" onClick={repeatLastCapacity}>
+            <RotateCcw size={18} />
+            重复上次
           </button>
         </div>
 
@@ -650,15 +663,16 @@ function HistoryView({ state }) {
             const summary = getDaySummary(days, key, state.selectedCup);
             const inMonth = day.getMonth() === monthDate.getMonth();
             const progress = Math.min(1, summary.totalMl / Math.max(1, targetMl));
+            const achieved = summary.totalMl >= targetMl;
             return (
               <button
                 key={key}
-                className={`day-cell ${inMonth ? "" : "muted"} ${key === selectedDate ? "selected" : ""} ${key === today ? "today" : ""}`}
+                className={`day-cell ${inMonth ? "" : "muted"} ${key === selectedDate ? "selected" : ""} ${key === today ? "today" : ""} ${achieved ? "achieved" : ""}`}
                 onClick={() => setSelectedDate(key)}
                 style={{ "--fill": `${Math.round(progress * 100)}%` }}
               >
                 <span>{day.getDate()}</span>
-                <em>{summary.cups ? `${summary.cups}杯` : ""}</em>
+                <em>{summary.cups ? `${summary.cups}杯` : ""}{achieved ? <b>达标</b> : null}</em>
               </button>
             );
           })}
