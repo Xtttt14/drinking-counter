@@ -89,6 +89,20 @@ function setDay(key, day) {
   store.set("days", days);
 }
 
+function getAllDays() {
+  const days = store.get("days", {});
+  return Object.fromEntries(
+    Object.entries(days).map(([key, day]) => [
+      key,
+      {
+        entries: Array.isArray(day.entries)
+          ? [...day.entries].sort((a, b) => new Date(a.at) - new Date(b.at))
+          : []
+      }
+    ])
+  );
+}
+
 function getState() {
   const settings = { ...defaultSettings, ...store.get("settings", {}) };
   settings.cupProfiles = Array.isArray(settings.cupProfiles) && settings.cupProfiles.length
@@ -102,6 +116,7 @@ function getState() {
   const cups = day.entries.length;
   const targetMl = settings.targetCups * selectedCup.ml;
   const lastEntry = day.entries[day.entries.length - 1] || null;
+  const days = getAllDays();
 
   return {
     date: key,
@@ -113,6 +128,9 @@ function getState() {
       totalMl,
       targetMl,
       lastEntry
+    },
+    history: {
+      days
     }
   };
 }
@@ -240,15 +258,20 @@ function addDrink(payload = {}) {
   const state = getState();
   const settings = state.settings;
   const selectedCup = state.selectedCup;
-  const key = todayKey();
+  const baseDate = payload.date ? new Date(`${payload.date}T00:00:00`) : new Date();
+  const key = payload.date || todayKey();
+  const at = payload.date && payload.time
+    ? new Date(`${payload.date}T${payload.time}:00`)
+    : baseDate;
   const day = getDay(key);
   day.entries.push({
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    at: new Date().toISOString(),
+    at: at.toISOString(),
     ml: Number(payload.ml || selectedCup.ml),
     cupId: selectedCup.id,
     source: payload.source || "button"
   });
+  day.entries.sort((a, b) => new Date(a.at) - new Date(b.at));
   setDay(key, day);
   snoozedUntil = null;
   broadcastState();

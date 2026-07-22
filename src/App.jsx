@@ -1,5 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Bell, Check, Clock, CupSoda, Droplets, Minus, Settings, Target, X } from "lucide-react";
+import {
+  ArrowLeft,
+  BarChart3,
+  Bell,
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  CupSoda,
+  Droplets,
+  Minus,
+  Plus,
+  Settings,
+  Target,
+  X
+} from "lucide-react";
 
 const fallbackSettings = {
   targetCups: 8,
@@ -30,8 +46,18 @@ const fallbackState = {
     totalMl: 0,
     targetMl: 1600,
     lastEntry: null
+  },
+  history: {
+    days: {}
   }
 };
+
+function dateKey(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 function formatTime(iso) {
   if (!iso) return "今天还未记录";
@@ -40,6 +66,64 @@ function formatTime(iso) {
     minute: "2-digit",
     hour12: false
   }).format(new Date(iso));
+}
+
+function formatMonth(date) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "long"
+  }).format(date);
+}
+
+function formatDateLabel(key) {
+  if (!key) return "未选择日期";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+    weekday: "long"
+  }).format(new Date(`${key}T00:00:00`));
+}
+
+function getDaySummary(days, key) {
+  const entries = days?.[key]?.entries || [];
+  return {
+    key,
+    entries,
+    cups: entries.length,
+    totalMl: entries.reduce((sum, entry) => sum + Number(entry.ml || 0), 0)
+  };
+}
+
+function startOfWeek(date) {
+  const next = new Date(date);
+  const day = next.getDay() || 7;
+  next.setDate(next.getDate() - day + 1);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function daysBetween(start, count) {
+  return Array.from({ length: count }, (_, index) => {
+    const day = new Date(start);
+    day.setDate(start.getDate() + index);
+    return day;
+  });
+}
+
+function monthGrid(monthDate) {
+  const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const gridStart = startOfWeek(first);
+  return daysBetween(gridStart, 42);
+}
+
+function summarizeRange(days, dates) {
+  const summaries = dates.map((date) => getDaySummary(days, dateKey(date)));
+  return {
+    days: summaries,
+    cups: summaries.reduce((sum, day) => sum + day.cups, 0),
+    totalMl: summaries.reduce((sum, day) => sum + day.totalMl, 0),
+    activeDays: summaries.filter((day) => day.cups > 0).length
+  };
 }
 
 function App() {
@@ -125,6 +209,14 @@ function App() {
     saveSettings(next);
   }
 
+  const title = view === "cups"
+    ? "选择杯子容积"
+    : view === "settings"
+      ? "偏好设置"
+      : view === "history"
+        ? "历史与补记"
+        : "今日饮水";
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -141,6 +233,9 @@ function App() {
           </button>
           <button className={view === "progress" ? "active" : ""} onClick={() => setView("progress")}>
             <Droplets size={18} /> 进度
+          </button>
+          <button className={view === "history" ? "active" : ""} onClick={() => setView("history")}>
+            <CalendarDays size={18} /> 历史
           </button>
           <button className={view === "settings" ? "active" : ""} onClick={() => setView("settings")}>
             <Settings size={18} /> 设置
@@ -162,7 +257,7 @@ function App() {
             )}
             <div>
               <p>{state.date || "今天"}</p>
-              <h1>{view === "cups" ? "选择杯子容积" : view === "settings" ? "偏好设置" : "今日饮水"}</h1>
+              <h1>{title}</h1>
             </div>
           </div>
           <button className="icon-button close" onClick={() => window.waterApi.requestClose()} aria-label="关闭">
@@ -188,7 +283,12 @@ function App() {
             remainingCups={remainingCups}
             remainingMl={remainingMl}
             updateSetting={updateSetting}
+            onOpenHistory={() => setView("history")}
           />
+        )}
+
+        {view === "history" && (
+          <HistoryView state={state} setState={setState} />
         )}
 
         {view === "settings" && (
@@ -232,7 +332,7 @@ function CupList({ cups, selectedCupId, onChoose, onAdd, onUpdate, onRemove }) {
   );
 }
 
-function ProgressView({ state, percent, remainingCups, remainingMl, updateSetting }) {
+function ProgressView({ state, percent, remainingCups, remainingMl, updateSetting, onOpenHistory }) {
   const displayValue = state.settings.progressMode === "cups"
     ? `${state.today.cups}/${state.settings.targetCups}`
     : `${state.today.totalMl}/${state.today.targetMl}`;
@@ -284,6 +384,10 @@ function ProgressView({ state, percent, remainingCups, remainingMl, updateSettin
             <Minus size={18} />
             撤销上一杯
           </button>
+          <button className="manual-button" onClick={onOpenHistory}>
+            <Plus size={18} />
+            补记时间
+          </button>
         </div>
       </div>
 
@@ -324,6 +428,175 @@ function ProgressView({ state, percent, remainingCups, remainingMl, updateSettin
         </div>
       </aside>
     </section>
+  );
+}
+
+function HistoryView({ state, setState }) {
+  const today = dateKey();
+  const [selectedDate, setSelectedDate] = useState(state.date || today);
+  const [monthDate, setMonthDate] = useState(new Date(`${state.date || today}T00:00:00`));
+  const [manualTime, setManualTime] = useState(() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  });
+  const [manualMl, setManualMl] = useState(state.selectedCup?.ml || 200);
+
+  useEffect(() => {
+    setManualMl(state.selectedCup?.ml || 200);
+  }, [state.selectedCup?.ml]);
+
+  const days = state.history?.days || {};
+  const selectedSummary = getDaySummary(days, selectedDate);
+  const targetMl = state.settings.targetCups * state.selectedCup.ml;
+  const weekStats = useMemo(() => {
+    const selected = new Date(`${selectedDate}T00:00:00`);
+    return summarizeRange(days, daysBetween(startOfWeek(selected), 7));
+  }, [days, selectedDate]);
+  const monthStats = useMemo(() => {
+    const count = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+    return summarizeRange(days, daysBetween(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1), count));
+  }, [days, monthDate]);
+  const gridDays = monthGrid(monthDate);
+
+  function moveMonth(offset) {
+    setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() + offset, 1));
+  }
+
+  async function submitManual(event) {
+    event.preventDefault();
+    const next = await window.waterApi.addDrink({
+      date: selectedDate,
+      time: manualTime,
+      ml: Number(manualMl) || state.selectedCup.ml,
+      source: "manual"
+    });
+    setState(next);
+  }
+
+  return (
+    <section className="history-page">
+      <div className="calendar-panel">
+        <div className="calendar-head">
+          <button className="icon-button small" onClick={() => moveMonth(-1)} aria-label="上个月">
+            <ChevronLeft size={18} />
+          </button>
+          <strong>{formatMonth(monthDate)}</strong>
+          <button className="icon-button small" onClick={() => moveMonth(1)} aria-label="下个月">
+            <ChevronRight size={18} />
+          </button>
+        </div>
+        <div className="weekday-row">
+          {["一", "二", "三", "四", "五", "六", "日"].map((day) => <span key={day}>{day}</span>)}
+        </div>
+        <div className="calendar-grid">
+          {gridDays.map((day) => {
+            const key = dateKey(day);
+            const summary = getDaySummary(days, key);
+            const inMonth = day.getMonth() === monthDate.getMonth();
+            const progress = Math.min(1, summary.totalMl / Math.max(1, targetMl));
+            return (
+              <button
+                key={key}
+                className={`day-cell ${inMonth ? "" : "muted"} ${key === selectedDate ? "selected" : ""} ${key === today ? "today" : ""}`}
+                onClick={() => setSelectedDate(key)}
+                style={{ "--fill": `${Math.round(progress * 100)}%` }}
+              >
+                <span>{day.getDate()}</span>
+                <em>{summary.cups ? `${summary.cups}杯` : ""}</em>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="history-side">
+        <form className="manual-card" onSubmit={submitManual}>
+          <div className="card-title">
+            <Plus size={18} />
+            <strong>补记一杯</strong>
+          </div>
+          <p>{formatDateLabel(selectedDate)}</p>
+          <div className="manual-fields">
+            <label>
+              <span>日期</span>
+              <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
+            </label>
+            <label>
+              <span>时间</span>
+              <input type="time" value={manualTime} onChange={(event) => setManualTime(event.target.value)} />
+            </label>
+            <label>
+              <span>容量</span>
+              <input type="number" min="50" step="10" value={manualMl} onChange={(event) => setManualMl(event.target.value)} />
+            </label>
+          </div>
+          <button className="add-button" type="submit">
+            <Plus size={18} />
+            记入历史
+          </button>
+        </form>
+
+        <div className="history-card day-detail">
+          <div className="card-title">
+            <Clock size={18} />
+            <strong>当天明细</strong>
+          </div>
+          <div className="day-total">
+            <strong>{selectedSummary.cups}杯</strong>
+            <span>{selectedSummary.totalMl}ml</span>
+          </div>
+          {selectedSummary.entries.length === 0 ? (
+            <div className="empty-state compact">
+              <Droplets size={28} />
+              <span>这天还没有记录</span>
+            </div>
+          ) : (
+            <ol className="timeline full">
+              {[...selectedSummary.entries].reverse().map((entry, index) => (
+                <li key={entry.id}>
+                  <span>{formatTime(entry.at)}</span>
+                  <strong>第{selectedSummary.entries.length - index}杯</strong>
+                  <em>{entry.ml}ml</em>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      </div>
+
+      <div className="stats-panel">
+        <StatBlock title="本周统计" stats={weekStats} targetMl={targetMl} />
+        <StatBlock title="本月统计" stats={monthStats} targetMl={targetMl} wide />
+      </div>
+    </section>
+  );
+}
+
+function StatBlock({ title, stats, targetMl, wide = false }) {
+  const maxMl = Math.max(targetMl, ...stats.days.map((day) => day.totalMl), 1);
+  const avgMl = Math.round(stats.totalMl / Math.max(1, stats.days.length));
+
+  return (
+    <article className={`range-card ${wide ? "wide" : ""}`}>
+      <div className="range-head">
+        <span><BarChart3 size={17} />{title}</span>
+        <strong>{stats.totalMl}ml</strong>
+      </div>
+      <div className="range-meta">
+        <span>{stats.cups}杯</span>
+        <span>{stats.activeDays}天有记录</span>
+        <span>日均{avgMl}ml</span>
+      </div>
+      <div className="bar-strip">
+        {stats.days.map((day) => (
+          <span
+            key={day.key}
+            title={`${day.key} ${day.totalMl}ml`}
+            style={{ height: `${Math.max(8, Math.round((day.totalMl / maxMl) * 100))}%` }}
+          />
+        ))}
+      </div>
+    </article>
   );
 }
 
