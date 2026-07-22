@@ -84,9 +84,11 @@ function formatDateLabel(key) {
   }).format(new Date(`${key}T00:00:00`));
 }
 
-function getDaySummary(days, key, cupId) {
+function getDaySummary(days, key, cup) {
   const allEntries = days?.[key]?.entries || [];
-  const entries = cupId ? allEntries.filter((entry) => entry.cupId === cupId) : allEntries;
+  const entries = cup
+    ? allEntries.filter((entry) => (entry.cupId ? entry.cupId === cup.id : Number(entry.ml) === Number(cup.ml)))
+    : allEntries;
   return {
     key,
     entries,
@@ -117,8 +119,8 @@ function monthGrid(monthDate) {
   return daysBetween(gridStart, 42);
 }
 
-function summarizeRange(days, dates, cupId) {
-  const summaries = dates.map((date) => getDaySummary(days, dateKey(date), cupId));
+function summarizeRange(days, dates, cup) {
+  const summaries = dates.map((date) => getDaySummary(days, dateKey(date), cup));
   return {
     days: summaries,
     cups: summaries.reduce((sum, day) => sum + day.cups, 0),
@@ -129,6 +131,23 @@ function summarizeRange(days, dates, cupId) {
 
 const hourOptions = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
 const minuteOptions = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"));
+const minuteWheelOptions = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
+
+function normalizeTimeInput(value, fallback = "00:00") {
+  const match = value.trim().match(/^(\d{1,2}):?(\d{0,2})$/);
+  if (!match) return fallback;
+  const hour = Math.min(23, Math.max(0, Number(match[1] || 0)));
+  const minute = Math.min(59, Math.max(0, Number(match[2] || 0)));
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function polarPosition(index, total, radius) {
+  const angle = (index / total) * Math.PI * 2 - Math.PI / 2;
+  return {
+    left: `${50 + Math.cos(angle) * radius}%`,
+    top: `${50 + Math.sin(angle) * radius}%`
+  };
+}
 
 function App() {
   const [state, setState] = useState(fallbackState);
@@ -342,7 +361,7 @@ function ProgressView({ state, setState, percent, remainingCups, remainingMl, up
     return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
   });
   const [manualMl, setManualMl] = useState(state.selectedCup?.ml || 200);
-  const [manualHour, manualMinute] = manualTime.split(":");
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
   const displayValue = state.settings.progressMode === "cups"
     ? `${state.today.cups}/${state.settings.targetCups}`
     : `${state.today.totalMl}/${state.today.targetMl}`;
@@ -359,10 +378,6 @@ function ProgressView({ state, setState, percent, remainingCups, remainingMl, up
       source: "manual"
     });
     setState(next);
-  }
-
-  function updateManualTime(part, value) {
-    setManualTime(part === "hour" ? `${value}:${manualMinute}` : `${manualHour}:${value}`);
   }
 
   return (
@@ -421,13 +436,10 @@ function ProgressView({ state, setState, percent, remainingCups, remainingMl, up
           </div>
           <div className="time-select-group" aria-label="补记时间">
             <span>时间</span>
-            <select value={manualHour} onChange={(event) => updateManualTime("hour", event.target.value)} aria-label="补记小时">
-              {hourOptions.map((hour) => <option value={hour} key={hour}>{hour}</option>)}
-            </select>
-            <em>:</em>
-            <select value={manualMinute} onChange={(event) => updateManualTime("minute", event.target.value)} aria-label="补记分钟">
-              {minuteOptions.map((minute) => <option value={minute} key={minute}>{minute}</option>)}
-            </select>
+            <button className="time-display-button" type="button" onClick={() => setTimePickerOpen(true)}>
+              <Clock size={15} />
+              {manualTime}
+            </button>
           </div>
           <label>
             <span>容量</span>
@@ -435,6 +447,13 @@ function ProgressView({ state, setState, percent, remainingCups, remainingMl, up
           </label>
           <button className="manual-button" type="submit">记入</button>
         </form>
+        {timePickerOpen && (
+          <TimeWheelPicker
+            value={manualTime}
+            onChange={setManualTime}
+            onClose={() => setTimePickerOpen(false)}
+          />
+        )}
       </div>
 
       <aside className="info-column">
@@ -477,23 +496,122 @@ function ProgressView({ state, setState, percent, remainingCups, remainingMl, up
   );
 }
 
+function TimeWheelPicker({ value, onChange, onClose }) {
+  const [draft, setDraft] = useState(value);
+  const [mode, setMode] = useState("hour");
+  const [hour, minute] = normalizeTimeInput(draft, value).split(":");
+
+  function commit(nextTime = draft) {
+    onChange(normalizeTimeInput(nextTime, value));
+    onClose();
+  }
+
+  function chooseHour(nextHour) {
+    setDraft(`${nextHour}:${minute}`);
+    setMode("minute");
+  }
+
+  function chooseMinute(nextMinute) {
+    setDraft(`${hour}:${nextMinute}`);
+  }
+
+  return (
+    <div className="time-popover" role="dialog" aria-label="选择补记时间">
+      <div className="time-popover-backdrop" onClick={onClose} />
+      <div className="time-picker-card">
+        <div className="time-editor">
+          <button type="button" className={mode === "hour" ? "active" : ""} onClick={() => setMode("hour")}>
+            {hour}
+          </button>
+          <span>:</span>
+          <button type="button" className={mode === "minute" ? "active" : ""} onClick={() => setMode("minute")}>
+            {minute}
+          </button>
+        </div>
+        <input
+          className="time-direct-input"
+          value={draft}
+          inputMode="numeric"
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={() => setDraft(normalizeTimeInput(draft, value))}
+          aria-label="直接输入时间"
+        />
+
+        <div className="clock-face">
+          {mode === "hour" ? (
+            <ClockFace
+              type="hour"
+              value={hour}
+              onChoose={chooseHour}
+            />
+          ) : (
+            <ClockFace
+              type="minute"
+              value={minute}
+              onChoose={chooseMinute}
+            />
+          )}
+        </div>
+
+        <div className="time-picker-actions">
+          <button type="button" onClick={onClose}>取消</button>
+          <button type="button" onClick={() => commit()}>确定</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClockFace({ type, value, onChoose }) {
+  const isHour = type === "hour";
+  const values = isHour ? hourOptions : minuteWheelOptions;
+  const activeIndex = isHour ? Number(value) : Math.round(Number(value) / 5) % 12;
+  const handAngle = isHour
+    ? ((Number(value) % 12) / 12) * 360
+    : (Number(value) / 60) * 360;
+
+  return (
+    <div className={`clock-dial ${isHour ? "hour-dial" : "minute-dial"}`}>
+      <span className="clock-hand" style={{ transform: `translateX(-50%) rotate(${handAngle}deg)` }} />
+      <span className="clock-pin" />
+      {values.map((item, index) => {
+        const radius = isHour && (item === "00" || Number(item) > 12) ? 25 : 39;
+        const position = isHour
+          ? polarPosition(Number(item) % 12, 12, radius)
+          : polarPosition(index, values.length, 39);
+        const selected = isHour ? item === value : index === activeIndex;
+        return (
+          <button
+            type="button"
+            key={item}
+            className={selected ? "selected" : ""}
+            style={position}
+            onClick={() => onChoose(item)}
+          >
+            {item}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function HistoryView({ state }) {
   const today = dateKey();
   const [selectedDate, setSelectedDate] = useState(state.date || today);
   const [monthDate, setMonthDate] = useState(new Date(`${state.date || today}T00:00:00`));
 
   const days = state.history?.days || {};
-  const selectedCupId = state.selectedCup?.id;
-  const selectedSummary = getDaySummary(days, selectedDate, selectedCupId);
+  const selectedSummary = getDaySummary(days, selectedDate, state.selectedCup);
   const targetMl = state.settings.targetCups * state.selectedCup.ml;
   const weekStats = useMemo(() => {
     const selected = new Date(`${selectedDate}T00:00:00`);
-    return summarizeRange(days, daysBetween(startOfWeek(selected), 7), selectedCupId);
-  }, [days, selectedDate, selectedCupId]);
+    return summarizeRange(days, daysBetween(startOfWeek(selected), 7), state.selectedCup);
+  }, [days, selectedDate, state.selectedCup]);
   const monthStats = useMemo(() => {
     const count = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
-    return summarizeRange(days, daysBetween(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1), count), selectedCupId);
-  }, [days, monthDate, selectedCupId]);
+    return summarizeRange(days, daysBetween(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1), count), state.selectedCup);
+  }, [days, monthDate, state.selectedCup]);
   const gridDays = monthGrid(monthDate);
 
   function moveMonth(offset) {
@@ -518,7 +636,7 @@ function HistoryView({ state }) {
         <div className="calendar-grid">
           {gridDays.map((day) => {
             const key = dateKey(day);
-            const summary = getDaySummary(days, key, selectedCupId);
+            const summary = getDaySummary(days, key, state.selectedCup);
             const inMonth = day.getMonth() === monthDate.getMonth();
             const progress = Math.min(1, summary.totalMl / Math.max(1, targetMl));
             return (
