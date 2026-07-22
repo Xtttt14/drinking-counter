@@ -156,7 +156,7 @@ function getAssetPath(name) {
 }
 
 function createTrayImage() {
-  for (const asset of ["app.ico", "app.png"]) {
+  for (const asset of ["app.png", "app.ico"]) {
     const image = nativeImage.createFromPath(getAssetPath(asset));
     if (!image.isEmpty()) {
       return image.resize({ width: 16, height: 16 });
@@ -201,7 +201,7 @@ function createWindow() {
     backgroundColor: "#f4f6f8",
     show: false,
     title: "drinking-counter",
-    icon: getAssetPath("app.ico"),
+    icon: getAssetPath("app.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

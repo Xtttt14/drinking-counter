@@ -15,6 +15,7 @@ import {
   Settings,
   Target,
 } from "lucide-react";
+import appIcon from "../electron/assets/app.png";
 
 const fallbackSettings = {
   targetCups: 8,
@@ -243,7 +244,7 @@ function App() {
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark"><Droplets size={22} /></span>
+          <span className="brand-mark"><img src={appIcon} alt="" /></span>
           <div>
             <strong>drinking-counter</strong>
             <span>本地工作助手</span>

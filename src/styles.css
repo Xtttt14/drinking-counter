@@ -68,8 +68,14 @@ button:disabled {
   display: grid;
   place-items: center;
   border-radius: 8px;
-  color: #7d8a96;
   background: #e8f4ff;
+  overflow: hidden;
+}
+
+.brand-mark img {
+  width: 34px;
+  height: 34px;
+  display: block;
 }
 
 .brand strong {
