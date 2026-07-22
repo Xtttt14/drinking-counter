@@ -1,6 +1,6 @@
 # drinking-counter
 
-饮水提醒是一个本地 Windows 桌面饮水统计与提醒工具。它使用 Electron、React 和 Vite 构建，数据保存在本机，适合在工作时间常驻托盘，记录每天喝了多少水，并在太久没有喝水时发出系统通知。
+drinking-counter 是一个本地 Windows 桌面饮水统计与提醒工具。它使用 Electron、React 和 Vite 构建，数据保存在本机，适合在工作时间常驻托盘，记录每天喝了多少水，并在太久没有喝水时发出系统通知。
 
 ## 功能
 
@@ -60,7 +60,7 @@ npm run dist
 打包后的程序位于：
 
 ```text
-release/win-unpacked/饮水提醒.exe
+release/win-unpacked/drinking-counter.exe
 ```
 
 ## 项目结构

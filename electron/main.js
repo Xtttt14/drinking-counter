@@ -160,7 +160,7 @@ function createTrayImage() {
 function updateTray() {
   if (!tray) return;
   const state = getState();
-  tray.setToolTip(`饮水提醒 ${state.today.cups}/${state.settings.targetCups}杯`);
+  tray.setToolTip(`drinking-counter ${state.today.cups}/${state.settings.targetCups}杯`);
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "显示主窗口", click: showWindow },
     { label: `加一杯 (${state.selectedCup.ml}ml)`, click: () => addDrink({ source: "tray" }) },
@@ -186,7 +186,7 @@ function createWindow() {
     minHeight: 760,
     backgroundColor: "#f4f6f8",
     show: false,
-    title: "饮水提醒",
+    title: "drinking-counter",
     icon: path.join(__dirname, "assets", "tray.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -220,8 +220,8 @@ function createWindow() {
       buttons: ["隐藏到托盘", "退出程序", "取消"],
       defaultId: 0,
       cancelId: 2,
-      title: "关闭饮水提醒",
-      message: "关闭饮水提醒？",
+      title: "关闭 drinking-counter",
+      message: "关闭 drinking-counter？",
       detail: "隐藏后会继续在托盘运行并按设置提醒。",
       checkboxLabel: "不再询问",
       checkboxChecked: false
@@ -378,7 +378,7 @@ ipcMain.handle("app:resolve-close-choice", (_, choice) => {
 });
 
 app.whenReady().then(() => {
-  app.setAppUserModelId("local.whimsy.water");
+  app.setAppUserModelId("local.drinking.counter");
   createAppMenu();
   tray = new Tray(createTrayImage());
   tray.on("double-click", showWindow);

@@ -223,7 +223,7 @@ function App() {
         <div className="brand">
           <span className="brand-mark"><Droplets size={22} /></span>
           <div>
-            <strong>饮水提醒</strong>
+            <strong>drinking-counter</strong>
             <span>本地工作助手</span>
           </div>
         </div>

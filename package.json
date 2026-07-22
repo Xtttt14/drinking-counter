@@ -26,8 +26,8 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "local.whimsy.water",
-    "productName": "饮水提醒",
+    "appId": "local.drinking.counter",
+    "productName": "drinking-counter",
     "directories": {
       "output": "release"
     },
