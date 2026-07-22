@@ -13,6 +13,7 @@ const defaultSettings = {
   ],
   selectedCupId: null,
   hasChosenCup: false,
+  targetCupsByCupId: {},
   workStart: "09:30",
   workEnd: "18:30",
   staleMinutes: 60,
@@ -35,6 +36,7 @@ let mainWindow;
 let tray;
 let reminderTimer;
 let snoozedUntil = null;
+let lastReminder = null;
 let pendingClose = false;
 
 function createAppMenu() {
@@ -113,14 +115,20 @@ function getState() {
   settings.cupProfiles = Array.isArray(settings.cupProfiles) && settings.cupProfiles.length
     ? settings.cupProfiles
     : defaultSettings.cupProfiles;
+  settings.targetCupsByCupId = settings.targetCupsByCupId && typeof settings.targetCupsByCupId === "object"
+    ? settings.targetCupsByCupId
+    : {};
   const selectedCup = settings.cupProfiles.find((cup) => cup.id === settings.selectedCupId)
     || settings.cupProfiles[0];
+  const selectedTargetCups = Number(settings.targetCupsByCupId[selectedCup.id] || settings.targetCups)
+    || defaultSettings.targetCups;
+  settings.targetCups = selectedTargetCups;
   const key = todayKey();
   const day = getDay(key);
   const selectedEntries = day.entries.filter((entry) => entryMatchesCup(entry, selectedCup));
   const totalMl = selectedEntries.reduce((sum, item) => sum + item.ml, 0);
   const cups = selectedEntries.length;
-  const targetMl = settings.targetCups * selectedCup.ml;
+  const targetMl = selectedTargetCups * selectedCup.ml;
   const lastEntry = selectedEntries[selectedEntries.length - 1] || null;
   const days = getAllDays();
 
@@ -285,6 +293,7 @@ function addDrink(payload = {}) {
   day.entries.sort((a, b) => new Date(a.at) - new Date(b.at));
   setDay(key, day);
   snoozedUntil = null;
+  lastReminder = null;
   broadcastState();
   if (payload.source === "tray" || payload.source === "menu") {
     new Notification({
@@ -308,6 +317,8 @@ function undoDrink() {
     day.entries.splice(index, 1);
   }
   setDay(key, day);
+  snoozedUntil = null;
+  lastReminder = null;
   broadcastState();
   return getState();
 }
@@ -329,7 +340,7 @@ function progressIsBehind(now, settings, cups) {
 
 function maybeNotify() {
   const state = getState();
-  const { settings, today } = state;
+  const { settings, selectedCup, today } = state;
   const now = new Date();
 
   if (!inWorkWindow(now, settings)) return;
@@ -338,8 +349,17 @@ function maybeNotify() {
 
   const lastAt = today.lastEntry ? new Date(today.lastEntry.at) : null;
   const stale = !lastAt || (now - lastAt) / 60000 >= settings.staleMinutes;
-  const behind = progressIsBehind(now, settings, today.cups);
+  const behind = stale && progressIsBehind(now, settings, today.cups);
   if (!stale && !behind) return;
+
+  const reminderKey = [
+    state.date,
+    selectedCup.id,
+    today.cups,
+    today.lastEntry?.id || "none",
+    stale ? "stale" : "behind"
+  ].join("|");
+  if (!settings.repeatUntilLogged && lastReminder?.key === reminderKey) return;
 
   const notification = new Notification({
     title: "该喝水了",
@@ -349,11 +369,12 @@ function maybeNotify() {
 
   notification.on("click", showWindow);
   notification.show();
+  lastReminder = { key: reminderKey, at: now.toISOString() };
 
   if (settings.repeatUntilLogged) {
     snoozedUntil = new Date(now.getTime() + settings.snoozeMinutes * 60000);
   } else {
-    snoozedUntil = new Date(now.getTime() + 24 * 60 * 60000);
+    snoozedUntil = null;
   }
 }
 
@@ -371,9 +392,20 @@ ipcMain.handle("settings:save", (_, settings) => {
   nextSettings.cupProfiles = Array.isArray(nextSettings.cupProfiles) && nextSettings.cupProfiles.length
     ? nextSettings.cupProfiles.map((cup) => ({ ...cup, ml: Number(cup.ml) || 200 }))
     : defaultSettings.cupProfiles;
-  nextSettings.targetCups = Number(nextSettings.targetCups) || defaultSettings.targetCups;
+  const selectedCup = nextSettings.cupProfiles.find((cup) => cup.id === nextSettings.selectedCupId)
+    || nextSettings.cupProfiles[0];
+  const targetCups = Number(nextSettings.targetCups) || defaultSettings.targetCups;
+  const targetCupsByCupId = nextSettings.targetCupsByCupId && typeof nextSettings.targetCupsByCupId === "object"
+    ? nextSettings.targetCupsByCupId
+    : {};
+  nextSettings.targetCupsByCupId = {
+    ...targetCupsByCupId,
+    [selectedCup.id]: targetCups
+  };
+  nextSettings.targetCups = targetCups;
   store.set("settings", nextSettings);
   snoozedUntil = null;
+  lastReminder = null;
   broadcastState();
   return getState();
 });

@@ -26,6 +26,7 @@ const fallbackSettings = {
   ],
   selectedCupId: null,
   hasChosenCup: false,
+  targetCupsByCupId: {},
   workStart: "09:30",
   workEnd: "18:30",
   staleMinutes: 60,
@@ -183,6 +184,12 @@ function App() {
         ml: Number(cup.ml) || 200
       }))
     };
+    const selectedCup = normalized.cupProfiles.find((cup) => cup.id === normalized.selectedCupId)
+      || normalized.cupProfiles[0];
+    normalized.targetCupsByCupId = {
+      ...(normalized.targetCupsByCupId || {}),
+      [selectedCup.id]: normalized.targetCups
+    };
     const nextState = await window.waterApi.saveSettings(normalized);
     setState(nextState);
     setDraftSettings(nextState.settings);
@@ -195,7 +202,14 @@ function App() {
   }
 
   async function chooseCup(cupId) {
-    const next = { ...draftSettings, selectedCupId: cupId, hasChosenCup: true };
+    const nextTargetCups = Number(draftSettings.targetCupsByCupId?.[cupId])
+      || fallbackSettings.targetCups;
+    const next = {
+      ...draftSettings,
+      selectedCupId: cupId,
+      hasChosenCup: true,
+      targetCups: nextTargetCups
+    };
     setDraftSettings(next);
     await saveSettings(next);
     setView("progress");
