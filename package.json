@@ -36,6 +36,16 @@
       "electron/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "electron/assets",
+        "to": "assets",
+        "filter": [
+          "app.ico",
+          "app.png"
+        ]
+      }
+    ],
     "win": {
       "icon": "electron/assets/app.ico",
       "target": "dir",

@@ -84,8 +84,9 @@ function formatDateLabel(key) {
   }).format(new Date(`${key}T00:00:00`));
 }
 
-function getDaySummary(days, key) {
-  const entries = days?.[key]?.entries || [];
+function getDaySummary(days, key, cupId) {
+  const allEntries = days?.[key]?.entries || [];
+  const entries = cupId ? allEntries.filter((entry) => entry.cupId === cupId) : allEntries;
   return {
     key,
     entries,
@@ -116,8 +117,8 @@ function monthGrid(monthDate) {
   return daysBetween(gridStart, 42);
 }
 
-function summarizeRange(days, dates) {
-  const summaries = dates.map((date) => getDaySummary(days, dateKey(date)));
+function summarizeRange(days, dates, cupId) {
+  const summaries = dates.map((date) => getDaySummary(days, dateKey(date), cupId));
   return {
     days: summaries,
     cups: summaries.reduce((sum, day) => sum + day.cups, 0),
@@ -125,6 +126,9 @@ function summarizeRange(days, dates) {
     activeDays: summaries.filter((day) => day.cups > 0).length
   };
 }
+
+const hourOptions = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
+const minuteOptions = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"));
 
 function App() {
   const [state, setState] = useState(fallbackState);
@@ -338,6 +342,7 @@ function ProgressView({ state, setState, percent, remainingCups, remainingMl, up
     return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
   });
   const [manualMl, setManualMl] = useState(state.selectedCup?.ml || 200);
+  const [manualHour, manualMinute] = manualTime.split(":");
   const displayValue = state.settings.progressMode === "cups"
     ? `${state.today.cups}/${state.settings.targetCups}`
     : `${state.today.totalMl}/${state.today.targetMl}`;
@@ -354,6 +359,10 @@ function ProgressView({ state, setState, percent, remainingCups, remainingMl, up
       source: "manual"
     });
     setState(next);
+  }
+
+  function updateManualTime(part, value) {
+    setManualTime(part === "hour" ? `${value}:${manualMinute}` : `${manualHour}:${value}`);
   }
 
   return (
@@ -410,10 +419,16 @@ function ProgressView({ state, setState, percent, remainingCups, remainingMl, up
             <Plus size={18} />
             <strong>补记今天</strong>
           </div>
-          <label>
+          <div className="time-select-group" aria-label="补记时间">
             <span>时间</span>
-            <input type="time" value={manualTime} onChange={(event) => setManualTime(event.target.value)} />
-          </label>
+            <select value={manualHour} onChange={(event) => updateManualTime("hour", event.target.value)} aria-label="补记小时">
+              {hourOptions.map((hour) => <option value={hour} key={hour}>{hour}</option>)}
+            </select>
+            <em>:</em>
+            <select value={manualMinute} onChange={(event) => updateManualTime("minute", event.target.value)} aria-label="补记分钟">
+              {minuteOptions.map((minute) => <option value={minute} key={minute}>{minute}</option>)}
+            </select>
+          </div>
           <label>
             <span>容量</span>
             <input type="number" min="50" step="10" value={manualMl} onChange={(event) => setManualMl(event.target.value)} />
@@ -468,16 +483,17 @@ function HistoryView({ state }) {
   const [monthDate, setMonthDate] = useState(new Date(`${state.date || today}T00:00:00`));
 
   const days = state.history?.days || {};
-  const selectedSummary = getDaySummary(days, selectedDate);
+  const selectedCupId = state.selectedCup?.id;
+  const selectedSummary = getDaySummary(days, selectedDate, selectedCupId);
   const targetMl = state.settings.targetCups * state.selectedCup.ml;
   const weekStats = useMemo(() => {
     const selected = new Date(`${selectedDate}T00:00:00`);
-    return summarizeRange(days, daysBetween(startOfWeek(selected), 7));
-  }, [days, selectedDate]);
+    return summarizeRange(days, daysBetween(startOfWeek(selected), 7), selectedCupId);
+  }, [days, selectedDate, selectedCupId]);
   const monthStats = useMemo(() => {
     const count = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
-    return summarizeRange(days, daysBetween(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1), count));
-  }, [days, monthDate]);
+    return summarizeRange(days, daysBetween(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1), count), selectedCupId);
+  }, [days, monthDate, selectedCupId]);
   const gridDays = monthGrid(monthDate);
 
   function moveMonth(offset) {
@@ -502,7 +518,7 @@ function HistoryView({ state }) {
         <div className="calendar-grid">
           {gridDays.map((day) => {
             const key = dateKey(day);
-            const summary = getDaySummary(days, key);
+            const summary = getDaySummary(days, key, selectedCupId);
             const inMonth = day.getMonth() === monthDate.getMonth();
             const progress = Math.min(1, summary.totalMl / Math.max(1, targetMl));
             return (

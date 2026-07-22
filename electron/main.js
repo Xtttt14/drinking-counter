@@ -103,6 +103,11 @@ function getAllDays() {
   );
 }
 
+function entryMatchesCup(entry, cup) {
+  if (entry.cupId) return entry.cupId === cup.id;
+  return Number(entry.ml) === Number(cup.ml);
+}
+
 function getState() {
   const settings = { ...defaultSettings, ...store.get("settings", {}) };
   settings.cupProfiles = Array.isArray(settings.cupProfiles) && settings.cupProfiles.length
@@ -112,10 +117,11 @@ function getState() {
     || settings.cupProfiles[0];
   const key = todayKey();
   const day = getDay(key);
-  const totalMl = day.entries.reduce((sum, item) => sum + item.ml, 0);
-  const cups = day.entries.length;
+  const selectedEntries = day.entries.filter((entry) => entryMatchesCup(entry, selectedCup));
+  const totalMl = selectedEntries.reduce((sum, item) => sum + item.ml, 0);
+  const cups = selectedEntries.length;
   const targetMl = settings.targetCups * selectedCup.ml;
-  const lastEntry = day.entries[day.entries.length - 1] || null;
+  const lastEntry = selectedEntries[selectedEntries.length - 1] || null;
   const days = getAllDays();
 
   return {
@@ -123,7 +129,7 @@ function getState() {
     settings,
     selectedCup,
     today: {
-      entries: day.entries,
+      entries: selectedEntries,
       cups,
       totalMl,
       targetMl,
@@ -143,8 +149,14 @@ function broadcastState() {
   updateTray();
 }
 
+function getAssetPath(name) {
+  return isDev
+    ? path.join(__dirname, "assets", name)
+    : path.join(process.resourcesPath, "assets", name);
+}
+
 function createTrayImage() {
-  const image = nativeImage.createFromPath(path.join(__dirname, "assets", "app.ico"));
+  const image = nativeImage.createFromPath(getAssetPath("app.png"));
   if (!image.isEmpty()) {
     return image.resize({ width: 16, height: 16 });
   }
@@ -187,7 +199,7 @@ function createWindow() {
     backgroundColor: "#f4f6f8",
     show: false,
     title: "drinking-counter",
-    icon: path.join(__dirname, "assets", "app.ico"),
+    icon: getAssetPath("app.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -284,8 +296,15 @@ function addDrink(payload = {}) {
 
 function undoDrink() {
   const key = todayKey();
+  const state = getState();
   const day = getDay(key);
-  day.entries.pop();
+  const index = [...day.entries]
+    .map((entry, entryIndex) => ({ entry, entryIndex }))
+    .reverse()
+    .find((item) => entryMatchesCup(item.entry, state.selectedCup))?.entryIndex;
+  if (index !== undefined) {
+    day.entries.splice(index, 1);
+  }
   setDay(key, day);
   broadcastState();
   return getState();
