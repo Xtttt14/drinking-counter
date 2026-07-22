@@ -144,7 +144,7 @@ function broadcastState() {
 }
 
 function createTrayImage() {
-  const image = nativeImage.createFromPath(path.join(__dirname, "assets", "tray.png"));
+  const image = nativeImage.createFromPath(path.join(__dirname, "assets", "app.ico"));
   if (!image.isEmpty()) {
     return image.resize({ width: 16, height: 16 });
   }
@@ -187,7 +187,7 @@ function createWindow() {
     backgroundColor: "#f4f6f8",
     show: false,
     title: "drinking-counter",
-    icon: path.join(__dirname, "assets", "tray.png"),
+    icon: path.join(__dirname, "assets", "app.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -258,11 +258,8 @@ function addDrink(payload = {}) {
   const state = getState();
   const settings = state.settings;
   const selectedCup = state.selectedCup;
-  const baseDate = payload.date ? new Date(`${payload.date}T00:00:00`) : new Date();
   const key = payload.date || todayKey();
-  const at = payload.date && payload.time
-    ? new Date(`${payload.date}T${payload.time}:00`)
-    : baseDate;
+  const at = payload.time ? new Date(`${key}T${payload.time}:00`) : new Date();
   const day = getDay(key);
   day.entries.push({
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,

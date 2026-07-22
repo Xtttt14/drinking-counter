@@ -214,7 +214,7 @@ function App() {
     : view === "settings"
       ? "偏好设置"
       : view === "history"
-        ? "历史与补记"
+        ? "历史统计"
         : "今日饮水";
 
   return (
@@ -279,16 +279,16 @@ function App() {
         {view === "progress" && (
           <ProgressView
             state={state}
+            setState={setState}
             percent={percent}
             remainingCups={remainingCups}
             remainingMl={remainingMl}
             updateSetting={updateSetting}
-            onOpenHistory={() => setView("history")}
           />
         )}
 
         {view === "history" && (
-          <HistoryView state={state} setState={setState} />
+          <HistoryView state={state} />
         )}
 
         {view === "settings" && (
@@ -332,10 +332,29 @@ function CupList({ cups, selectedCupId, onChoose, onAdd, onUpdate, onRemove }) {
   );
 }
 
-function ProgressView({ state, percent, remainingCups, remainingMl, updateSetting, onOpenHistory }) {
+function ProgressView({ state, setState, percent, remainingCups, remainingMl, updateSetting }) {
+  const [manualTime, setManualTime] = useState(() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  });
+  const [manualMl, setManualMl] = useState(state.selectedCup?.ml || 200);
   const displayValue = state.settings.progressMode === "cups"
     ? `${state.today.cups}/${state.settings.targetCups}`
     : `${state.today.totalMl}/${state.today.targetMl}`;
+
+  useEffect(() => {
+    setManualMl(state.selectedCup?.ml || 200);
+  }, [state.selectedCup?.ml]);
+
+  async function submitManual(event) {
+    event.preventDefault();
+    const next = await window.waterApi.addDrink({
+      time: manualTime,
+      ml: Number(manualMl) || state.selectedCup.ml,
+      source: "manual"
+    });
+    setState(next);
+  }
 
   return (
     <section className="progress-page">
@@ -384,11 +403,23 @@ function ProgressView({ state, percent, remainingCups, remainingMl, updateSettin
             <Minus size={18} />
             撤销上一杯
           </button>
-          <button className="manual-button" onClick={onOpenHistory}>
-            <Plus size={18} />
-            补记时间
-          </button>
         </div>
+
+        <form className="progress-manual" onSubmit={submitManual}>
+          <div className="manual-title">
+            <Plus size={18} />
+            <strong>补记今天</strong>
+          </div>
+          <label>
+            <span>时间</span>
+            <input type="time" value={manualTime} onChange={(event) => setManualTime(event.target.value)} />
+          </label>
+          <label>
+            <span>容量</span>
+            <input type="number" min="50" step="10" value={manualMl} onChange={(event) => setManualMl(event.target.value)} />
+          </label>
+          <button className="manual-button" type="submit">记入</button>
+        </form>
       </div>
 
       <aside className="info-column">
@@ -431,19 +462,10 @@ function ProgressView({ state, percent, remainingCups, remainingMl, updateSettin
   );
 }
 
-function HistoryView({ state, setState }) {
+function HistoryView({ state }) {
   const today = dateKey();
   const [selectedDate, setSelectedDate] = useState(state.date || today);
   const [monthDate, setMonthDate] = useState(new Date(`${state.date || today}T00:00:00`));
-  const [manualTime, setManualTime] = useState(() => {
-    const now = new Date();
-    return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  });
-  const [manualMl, setManualMl] = useState(state.selectedCup?.ml || 200);
-
-  useEffect(() => {
-    setManualMl(state.selectedCup?.ml || 200);
-  }, [state.selectedCup?.ml]);
 
   const days = state.history?.days || {};
   const selectedSummary = getDaySummary(days, selectedDate);
@@ -460,17 +482,6 @@ function HistoryView({ state, setState }) {
 
   function moveMonth(offset) {
     setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() + offset, 1));
-  }
-
-  async function submitManual(event) {
-    event.preventDefault();
-    const next = await window.waterApi.addDrink({
-      date: selectedDate,
-      time: manualTime,
-      ml: Number(manualMl) || state.selectedCup.ml,
-      source: "manual"
-    });
-    setState(next);
   }
 
   return (
@@ -510,36 +521,10 @@ function HistoryView({ state, setState }) {
       </div>
 
       <div className="history-side">
-        <form className="manual-card" onSubmit={submitManual}>
-          <div className="card-title">
-            <Plus size={18} />
-            <strong>补记一杯</strong>
-          </div>
-          <p>{formatDateLabel(selectedDate)}</p>
-          <div className="manual-fields">
-            <label>
-              <span>日期</span>
-              <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
-            </label>
-            <label>
-              <span>时间</span>
-              <input type="time" value={manualTime} onChange={(event) => setManualTime(event.target.value)} />
-            </label>
-            <label>
-              <span>容量</span>
-              <input type="number" min="50" step="10" value={manualMl} onChange={(event) => setManualMl(event.target.value)} />
-            </label>
-          </div>
-          <button className="add-button" type="submit">
-            <Plus size={18} />
-            记入历史
-          </button>
-        </form>
-
         <div className="history-card day-detail">
           <div className="card-title">
             <Clock size={18} />
-            <strong>当天明细</strong>
+            <strong>{formatDateLabel(selectedDate)}</strong>
           </div>
           <div className="day-total">
             <strong>{selectedSummary.cups}杯</strong>

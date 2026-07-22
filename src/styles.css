@@ -470,7 +470,7 @@ h1 {
 .action-grid {
   width: min(560px, 86%);
   display: grid;
-  grid-template-columns: minmax(170px, 1fr) minmax(140px, 0.65fr) minmax(128px, 0.55fr);
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.65fr);
   gap: 14px;
 }
 
@@ -508,6 +508,56 @@ h1 {
 .manual-button {
   color: #136fae;
   background: #e8f4ff;
+}
+
+.progress-manual {
+  width: min(560px, 86%);
+  min-height: 58px;
+  padding: 8px;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: auto minmax(110px, 0.75fr) minmax(110px, 0.75fr) 82px;
+  align-items: center;
+  gap: 10px;
+  background: #f6f9fb;
+  border: 1px solid #e3eaf0;
+}
+
+.manual-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #25313d;
+  white-space: nowrap;
+  padding: 0 8px;
+}
+
+.progress-manual label {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  color: #6f7a84;
+  font-size: 13px;
+}
+
+.progress-manual input {
+  width: 100%;
+  height: 38px;
+  min-width: 0;
+  border: 1px solid #dce3e9;
+  border-radius: 8px;
+  padding: 0 10px;
+  outline: none;
+  color: #111820;
+  background: #fff;
+}
+
+.progress-manual .manual-button {
+  width: 100%;
+  height: 38px;
+  border-radius: 8px;
 }
 
 .info-column {
@@ -706,7 +756,7 @@ h1 {
 .history-side {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 18px;
   overflow: hidden;
 }
