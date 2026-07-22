@@ -156,9 +156,11 @@ function getAssetPath(name) {
 }
 
 function createTrayImage() {
-  const image = nativeImage.createFromPath(getAssetPath("app.png"));
-  if (!image.isEmpty()) {
-    return image.resize({ width: 16, height: 16 });
+  for (const asset of ["app.ico", "app.png"]) {
+    const image = nativeImage.createFromPath(getAssetPath(asset));
+    if (!image.isEmpty()) {
+      return image.resize({ width: 16, height: 16 });
+    }
   }
 
   const svg = `
@@ -394,6 +396,7 @@ ipcMain.handle("app:resolve-close-choice", (_, choice) => {
 });
 
 app.whenReady().then(() => {
+  app.setName("drinking-counter");
   app.setAppUserModelId("local.drinking.counter");
   createAppMenu();
   tray = new Tray(createTrayImage());

@@ -131,7 +131,7 @@ button:disabled {
   min-height: 86px;
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 18px;
 }
 
@@ -167,11 +167,6 @@ h1 {
   color: #53606c;
   background: #fff;
   box-shadow: 0 14px 38px rgba(24, 38, 52, 0.08);
-}
-
-.icon-button.close {
-  width: 52px;
-  height: 52px;
 }
 
 .icon-button.small {
@@ -813,7 +808,8 @@ h1 {
 .settings-panel {
   width: min(840px, 100%);
   align-self: start;
-  margin-top: 2px;
+  justify-self: center;
+  margin-top: clamp(18px, 4vh, 54px);
   padding: 18px 30px;
   overflow: hidden;
 }

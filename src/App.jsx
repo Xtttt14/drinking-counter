@@ -14,7 +14,6 @@ import {
   Plus,
   Settings,
   Target,
-  X
 } from "lucide-react";
 
 const fallbackSettings = {
@@ -283,9 +282,6 @@ function App() {
               <h1>{title}</h1>
             </div>
           </div>
-          <button className="icon-button close" onClick={() => window.waterApi.requestClose()} aria-label="关闭">
-            <X size={20} />
-          </button>
         </header>
 
         {view === "cups" && (
