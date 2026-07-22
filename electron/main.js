@@ -126,6 +126,11 @@ function broadcastState() {
 }
 
 function createTrayImage() {
+  const image = nativeImage.createFromPath(path.join(__dirname, "assets", "tray.png"));
+  if (!image.isEmpty()) {
+    return image.resize({ width: 16, height: 16 });
+  }
+
   const svg = `
     <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
       <rect width="32" height="32" rx="8" fill="#1597ff"/>
@@ -147,7 +152,10 @@ function updateTray() {
 }
 
 function showWindow() {
-  if (!mainWindow) return;
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
   mainWindow.show();
   mainWindow.focus();
 }
@@ -161,6 +169,7 @@ function createWindow() {
     backgroundColor: "#f4f6f8",
     show: false,
     title: "饮水提醒",
+    icon: path.join(__dirname, "assets", "tray.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -180,7 +189,11 @@ function createWindow() {
       if (settings.closeAction === "hide") {
         event.preventDefault();
         mainWindow.hide();
+        broadcastState();
+        return;
       }
+      event.preventDefault();
+      quitApp();
       return;
     }
     event.preventDefault();
@@ -217,6 +230,10 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
   }
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
 }
 
 function addDrink(payload = {}) {
@@ -320,7 +337,7 @@ ipcMain.handle("settings:save", (_, settings) => {
   return getState();
 });
 ipcMain.handle("app:request-close", () => {
-  if (mainWindow) mainWindow.close();
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
 });
 ipcMain.handle("app:resolve-close-choice", (_, choice) => {
   if (choice.remember) {
@@ -328,7 +345,7 @@ ipcMain.handle("app:resolve-close-choice", (_, choice) => {
     store.set("settings", { ...settings, showClosePrompt: false, closeAction: choice.action });
   }
   if (choice.action === "hide") {
-    mainWindow.hide();
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
     broadcastState();
     return "hidden";
   }
@@ -351,6 +368,10 @@ app.on("window-all-closed", () => {});
 
 app.on("before-quit", () => {
   pendingClose = true;
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
 });
 function quitApp() {
   pendingClose = true;
