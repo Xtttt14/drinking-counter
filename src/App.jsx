@@ -745,14 +745,23 @@ function StatBlock({ title, stats, targetMl, wide = false }) {
 }
 
 function SettingsView({ draftSettings, updateSetting }) {
+  const [timePickerTarget, setTimePickerTarget] = useState(null);
+  const activeTimeValue = timePickerTarget ? draftSettings[timePickerTarget] : "00:00";
+
   return (
     <section className="settings-panel">
       <div className="setting-row">
         <label>工作时间</label>
         <div className="time-pair">
-          <input type="time" value={draftSettings.workStart} onChange={(e) => updateSetting("workStart", e.target.value)} />
+          <button className="settings-time-button" type="button" onClick={() => setTimePickerTarget("workStart")}>
+            <Clock size={16} />
+            {draftSettings.workStart}
+          </button>
           <span>至</span>
-          <input type="time" value={draftSettings.workEnd} onChange={(e) => updateSetting("workEnd", e.target.value)} />
+          <button className="settings-time-button" type="button" onClick={() => setTimePickerTarget("workEnd")}>
+            <Clock size={16} />
+            {draftSettings.workEnd}
+          </button>
         </div>
       </div>
       <SettingNumber label="久未喝水阈值" value={draftSettings.staleMinutes} min={10} max={240} suffix="分钟" onChange={(value) => updateSetting("staleMinutes", value)} />
@@ -778,16 +787,57 @@ function SettingsView({ draftSettings, updateSetting }) {
           <button className={draftSettings.closeAction === "quit" ? "picked" : ""} onClick={() => updateSetting("closeAction", "quit")}>退出程序</button>
         </div>
       </div>
+      {timePickerTarget && (
+        <TimeWheelPicker
+          value={activeTimeValue}
+          onChange={(value) => updateSetting(timePickerTarget, value)}
+          onClose={() => setTimePickerTarget(null)}
+        />
+      )}
     </section>
   );
 }
 
 function SettingNumber({ label, value, suffix, onChange, min, max, step = 1 }) {
+  const [draft, setDraft] = useState(String(value ?? ""));
+
+  useEffect(() => {
+    setDraft(String(value ?? ""));
+  }, [value]);
+
+  function commit() {
+    if (draft.trim() === "") {
+      setDraft(String(value ?? ""));
+      return;
+    }
+
+    const numeric = Number(draft);
+    if (!Number.isFinite(numeric)) {
+      setDraft(String(value ?? ""));
+      return;
+    }
+
+    const clamped = Math.min(max, Math.max(min, numeric));
+    setDraft(String(clamped));
+    onChange(clamped);
+  }
+
   return (
     <div className="setting-row">
       <label>{label}</label>
       <div className="number-field">
-        <input type="number" value={value} min={min} max={max} step={step} onChange={(event) => onChange(event.target.value)} />
+        <input
+          type="number"
+          value={draft}
+          min={min}
+          max={max}
+          step={step}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+          }}
+        />
         <span>{suffix}</span>
       </div>
     </div>

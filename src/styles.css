@@ -298,6 +298,7 @@ h1 {
 .cup-edit input,
 .number-field input,
 .time-pair input,
+.settings-time-button,
 .target-edit input,
 .compact-number input {
   height: 40px;
@@ -620,7 +621,7 @@ h1 {
 }
 
 .time-popover {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 5;
   display: grid;
@@ -1151,8 +1152,19 @@ h1 {
 }
 
 .number-field input,
-.time-pair input {
+.time-pair input,
+.settings-time-button {
   width: 128px;
+}
+
+.settings-time-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #14202b;
+  background: #f9fbfc;
+  font-weight: 650;
 }
 
 .number-field span,
